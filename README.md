@@ -93,3 +93,5 @@ Veja exemplos práticos no meu [postman]('https://elements.getpostman.com/redire
 [![Rocketseat](https://img.shields.io/badge/Rocketseat-7159C1?style=for-the-badge&logo=rocketseat&logoColor=white)](https://app.rocketseat.com.br/me/md-04583)
 [![Telegram](https://img.shields.io/badge/Telegram-40A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/@oliveiraMaxsuel)
 </div>
+
+<!-- teste -->
