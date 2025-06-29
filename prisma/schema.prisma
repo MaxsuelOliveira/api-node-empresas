@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // ⬅️ Substituir por oracle quando disponível oficialmente
+  url      = env("DATABASE_URL")
+}
+
+model Usuarios {
+  id           Int      @id @default(autoincrement())
+  nome         String
+  email        String   @unique
+  senha        String // hash da senha
+  is_admin     Boolean  @default(false)
+  data_criacao DateTime @default(now())
+
+  // Relações com os outros modelos, se quiser vincular quem criou
+  // empresas      Empresas[]    @relation(...)
+}
+
+model Empresas {
+  id           Int      @id @default(autoincrement())
+  razao_social String
+  fantasia     String
+  cnpj         String
+  observacao   String?
+  ativa        Boolean  @default(true)
+  data_criacao DateTime @default(now())
+
+  sistemas     Sistemas[] // ← adicione essa linha
+  contatos     Contatos[]
+  anydesk      Anydesk[]
+  servidores   Servidores[]
+  helpdesk     Helpdesk[]
+  certificados Certificados[]
+}
+
+model Contatos {
+  id           Int      @id @default(autoincrement())
+  empresa_id   Int
+  codigo       String?
+  cargo        String?
+  nome         String?
+  celular      String?
+  data_criacao DateTime @default(now())
+
+  empresa Empresas @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+}
+
+model Anydesk {
+  id           Int      @id @default(autoincrement())
+  empresa_id   Int
+  codigo       String?
+  senha        String?
+  link         String?
+  descricao    String?
+  data_criacao DateTime @default(now())
+
+  empresa Empresas @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+}
+
+model Servidores {
+  id           Int      @id @default(autoincrement())
+  empresa_id   Int
+  host         String?
+  user         String?
+  senha        String?
+  data_criacao DateTime @default(now())
+
+  empresa Empresas @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+}
+
+model Helpdesk {
+  id           Int      @id @default(autoincrement())
+  empresa_id   Int
+  email        String?
+  senha        String?
+  data_criacao DateTime @default(now())
+
+  empresa Empresas @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+}
+
+model Certificados {
+  id               Int       @id @default(autoincrement())
+  empresa_id       Int
+  nome_certificado String
+  data_validade    DateTime?
+  tipo             String?
+  status           String
+  data_criacao     DateTime  @default(now())
+
+  empresa Empresas @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+}
+
+model Sistemas {
+  id           Int      @id @default(autoincrement())
+  nome_sistema String
+  versao       String
+  ativo        Boolean
+  empresa_id   Int
+  empresa      Empresas @relation(fields: [empresa_id], references: [id])
+}

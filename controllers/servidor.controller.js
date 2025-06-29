@@ -1,6 +1,7 @@
-const db = require("../db/database");
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
 
-exports.create = (req, res) => {
+exports.create = async (req, res) => {
   const { empresa_id, host, user, senha } = req.body;
 
   if (!host || !user || !senha) {
@@ -13,47 +14,131 @@ exports.create = (req, res) => {
     return res.status(422).json({ error: "ID da empresa é obrigatório" });
   }
 
-  db.run(
-    "INSERT INTO servidores (empresa_id, host, user, senha) VALUES (?, ?, ?, ?)",
-    [empresa_id, host, user, senha],
-    function (err) {
-      if (err) return res.status(422).json({ error: err.message });
-      res.json({ id: this.lastID });
-    }
-  );
+  try {
+    const servidor = await prisma.servidores.create({
+      data: {
+        empresa_id: Number(empresa_id),
+        host,
+        user,
+        senha,
+      },
+    });
+    res.status(201).json({ id: servidor.id });
+  } catch (err) {
+    console.error(err);
+    res
+      .status(422)
+      .json({ error: "Erro ao criar servidor", detail: err.message });
+  }
 };
 
-exports.list = (req, res) => {
+exports.list = async (req, res) => {
   const { empresa_id } = req.params;
 
   if (!empresa_id) {
     return res.status(422).json({ error: "ID da empresa é obrigatório" });
   }
 
-  db.all(
-    "SELECT * FROM servidores WHERE empresa_id = ?",
-    [empresa_id],
-    (err, rows) => {
-      if (err) return res.status(422).json({ error: err.message });
-      res.json(rows);
-    }
-  );
+  try {
+    const servidores = await prisma.servidores.findMany({
+      where: { empresa_id: Number(empresa_id) },
+    });
+    res.json(servidores);
+  } catch (err) {
+    console.error(err);
+    res
+      .status(422)
+      .json({ error: "Erro ao buscar servidores", detail: err.message });
+  }
 };
 
-exports.delete = (req, res) => {
+exports.getById = async (req, res) => {
   const { id } = req.body;
+  if (!id) {
+    return res.status(422).json({ error: "ID do servidor é obrigatório" });
+  }
+  try {
+    const servidor = await prisma.servidores.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!servidor) {
+      return res.status(404).json({ error: "Servidor não encontrado" });
+    }
+
+    res.json(servidor);
+  } catch (err) {
+    console.error(err);
+    res
+      .status(422)
+      .json({ error: "Erro ao buscar servidor", detail: err.message });
+  }
+};
+
+exports.update = async (req, res) => {
+  const { id, host, user, senha } = req.body;
+  if (!id) {
+    return res.status(422).json({ error: "ID do servidor é obrigatório" });
+  }
+  if (!host || !user || !senha) {
+    return res
+      .status(422)
+      .json({ error: "Host, usuário e senha são obrigatórios" });
+  }
+  try {
+    const servidor = await prisma.servidores.update({
+      where: { id: Number(id) },
+      data: { host, user, senha },
+    });
+    res.json(servidor);
+  } catch (err) {
+    if (err.code === "P2025") {
+      return res.status(404).json({ error: "Servidor não encontrado" });
+    }
+    console.error(err);
+    res
+      .status(422)
+      .json({ error: "Erro ao atualizar servidor", detail: err.message });
+  }
+};
+
+exports.delete = async (req, res) => {
+  const { empresa_id, id } = req.body;
 
   if (!id) {
     return res.status(422).json({ error: "ID do servidor é obrigatório" });
   }
 
-  db.run("DELETE FROM servidores WHERE id = ?", [id], function (err) {
-    if (err) return res.status(422).json({ error: err.message });
+  if (!empresa_id) {
+    return res.status(422).json({ error: "ID da empresa é obrigatório" });
+  }
 
-    if (this.changes === 0) {
-      return res.status(200).json({ error: "Servidor não encontrado" });
-    }
-
-    res.json({ message: "Servidor deletado com sucesso" });
+  // Verifica se o servidor pertence à empresa
+  const servidor = await prisma.servidores.findFirst({
+    where: {
+      id: Number(id),
+      empresa_id: Number(empresa_id),
+    },
   });
+
+  if (!servidor) {
+    return res
+      .status(404)
+      .json({ error: "Servidor não encontrado ou não pertence à empresa." });
+  }
+
+  try {
+    await prisma.servidores.delete({
+      where: { id: Number(id) },
+    });
+    res.json({ message: "Servidor deletado com sucesso" });
+  } catch (err) {
+    if (err.code === "P2025") {
+      return res.status(404).json({ error: "Servidor não encontrado" });
+    }
+    console.error(err);
+    res
+      .status(422)
+      .json({ error: "Erro ao deletar servidor", detail: err.message });
+  }
 };

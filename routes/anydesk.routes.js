@@ -4,6 +4,7 @@ const controller = require("../controllers/anydesk.controller");
 
 router.get("/:empresa_id", controller.list);
 router.post("/", controller.create);
-router.delete("/apagar", controller.delete);
+router.put("/", controller.update);
+router.delete("/", controller.delete);
 
 module.exports = router;

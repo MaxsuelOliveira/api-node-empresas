@@ -5,35 +5,6 @@ const path = require("path");
 
 const app = express();
 
-// Configurar pasta de logs
-const logsDir = path.join(__dirname, ".logs");
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir);
-}
-
-// Middleware simples para logar requisições
-app.use((req, res, next) => {
-  const now = new Date().toISOString();
-
-  const ip =
-    req.headers["x-forwarded-for"]?.split(",").shift() ||
-    req.connection?.remoteAddress ||
-    req.socket?.remoteAddress ||
-    req.ip ||
-    "unknown IP";
-
-  const userAgent = req.headers["user-agent"] || "unknown user-agent";
-  const logLine = `[${now}] ${ip} ${req.method} ${req.url} - ${userAgent}\n`;
-  const logFileName = path.join(logsDir, `${now.slice(0, 10)}.log`);
-
-  fs.appendFile(logFileName, logLine, (err) => {
-    if (err) console.error("Erro ao salvar log:", err);
-  });
-
-  next();
-});
-
-// Habilitar CORS
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header(
@@ -45,7 +16,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middlewares
 app.use(express.json());
 
 // Servir arquivos estáticos
@@ -59,6 +29,7 @@ app.get("/", (req, res) => {
 });
 
 // Importar rotas
+const usuarios = require("./routes/usuarios.routes");
 const contatos = require("./routes/contatos.routes");
 const anydesk = require("./routes/anydesk.routes");
 const servidor = require("./routes/servidor.routes");
@@ -67,6 +38,8 @@ const helpdesk = require("./routes/helpdesk.routes");
 const sistemas = require("./routes/sistemas.routes");
 const certificados = require("./routes/certificados.routes");
 
+// Verificar se os arquivos de rotas existem antes de importá-los
+app.use("/", usuarios);
 app.use("/empresas", empresas);
 app.use("/contatos", contatos);
 app.use("/anydesk", anydesk);
@@ -87,10 +60,10 @@ app.use((err, req, res, next) => {
 
 // Ler HOST e PORT do .env, com fallback
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || "0.0.0.0";
+const HOST = process.env.HOST;
 
 app.listen(PORT, HOST, () => {
-  console.log(`SERVER ON -> http://${HOST}:${PORT}`);
+  console.log(`[API] - [ONLINE] - http://${HOST}:${PORT}`);
 });
 
 // Função main (se precisar para outras configurações)
@@ -100,4 +73,4 @@ function main() {
   );
 }
 
-main();
+// main();

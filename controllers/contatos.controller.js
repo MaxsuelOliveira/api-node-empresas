@@ -1,108 +1,120 @@
-const db = require("../db/database");
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
 
-exports.create = (req, res) => {
-  const { empresa_id, nome, cargo, celular } = req.body;
+exports.create = async (req, res) => {
+  try {
+    const { empresa_id, nome, cargo, celular } = req.body;
 
-  if (!empresa_id || !nome || !celular) {
-    return res.status(400).json({
-      error: "Campos obrigatórios: empresa_id, nome e celular",
-    });
-  }
-
-  db.get(
-    "SELECT * FROM contatos WHERE empresa_id = ? AND celular = ?",
-    [empresa_id, celular],
-    (err, row) => {
-      if (err) {
-        console.error(err);
-        return res.status(422).json({ error: "Erro ao verificar duplicidade" });
-      }
-
-      if (row) {
-        return res.status(409).json({
-          error: "Celular já cadastrado para essa empresa",
-        });
-      }
-
-      db.run(
-        "INSERT INTO contatos (empresa_id, nome, cargo, celular) VALUES (?, ?, ?, ?)",
-        [empresa_id, nome, cargo || null, celular],
-        function (err) {
-          if (err) {
-            console.error(err);
-            return res.status(422).json({ error: "Erro ao salvar contato" });
-          }
-          res.status(201).json({ id: this.lastID });
-        }
-      );
+    if (!empresa_id || !nome || !celular) {
+      return res.status(400).json({
+        error: "Campos obrigatórios: empresa_id, nome e celular",
+      });
     }
-  );
+
+    // Verificar se a empresa existe
+    const empresa = await prisma.empresas.findUnique({
+      where: { id: Number(empresa_id) },
+    });
+    if (!empresa) {
+      return res.status(404).json({ error: "Empresa não encontrada" });
+    }
+
+    const duplicado = await prisma.contatos.findFirst({
+      where: {
+        empresa_id: Number(empresa_id),
+        celular,
+      },
+    });
+
+    if (duplicado) {
+      return res.status(409).json({
+        error: "Celular já cadastrado para essa empresa",
+      });
+    }
+
+    const novo = await prisma.contatos.create({
+      data: {
+        empresa_id: Number(empresa_id),
+        nome,
+        cargo: cargo || null,
+        celular,
+      },
+    });
+
+    res.status(201).json({ id: novo.id });
+  } catch (err) {
+    console.error(err);
+    res.status(422).json({ error: "Erro ao salvar contato" });
+  }
 };
 
-exports.list = (req, res) => {
+exports.list = async (req, res) => {
   const { empresa_id } = req.params;
 
   if (!empresa_id) {
-    return res
-      .status(400)
-      .json({ error: "ID da empresa é obrigatório" });
+    return res.status(400).json({ error: "ID da empresa é obrigatório" });
   }
 
-  db.all(
-    "SELECT * FROM contatos WHERE empresa_id = ?",
-    [empresa_id],
-    (err, rows) => {
-      if (err) {
-        console.error(err);
-        return res.status(422).json({ error: "Erro ao buscar contatos" });
-      }
-      res.json(rows);
-    }
-  );
+  try {
+    const contatos = await prisma.contatos.findMany({
+      where: { empresa_id: Number(empresa_id) },
+    });
+    res.json(contatos);
+  } catch (err) {
+    console.error(err);
+    res.status(422).json({ error: "Erro ao buscar contatos" });
+  }
 };
 
-exports.listAll = (req, res) => {
-  db.all("SELECT * FROM contatos", [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(422).json({ error: "Erro ao listar contatos" });
-    }
-    res.json(rows);
-  });
+exports.listAll = async (req, res) => {
+  try {
+    const contatos = await prisma.contatos.findMany();
+    res.json(contatos);
+  } catch (err) {
+    console.error(err);
+    res.status(422).json({ error: "Erro ao listar contatos" });
+  }
 };
 
-exports.findByCell = (req, res) => {
+exports.findByCell = async (req, res) => {
   const { celular } = req.body;
 
   if (!celular) {
     return res.status(400).json({ error: "Celular é obrigatório" });
   }
 
-  db.get(
-    `SELECT contatos.*, empresas.razao_social AS empresa_nomecompleto, empresas.cnpj AS empresa_cnpj 
-     FROM contatos 
-     JOIN empresas ON contatos.empresa_id = empresas.id 
-     WHERE contatos.celular = ?`,
-    [celular],
-    (err, row) => {
-      if (err) {
-        console.error(err);
-        return res.status(422).json({ error: "Erro ao buscar contato" });
-      }
+  try {
+    const contato = await prisma.contatos.findFirst({
+      where: { celular },
+      include: {
+        empresa: {
+          select: {
+            razao_social: true,
+            cnpj: true,
+          },
+        },
+      },
+    });
 
-      if (!row) {
-        return res.status(404).json({
-          error: "Contato não encontrado",
-          celular: false,
-        });
-      }
-
-      res.json(row);
+    if (!contato) {
+      return res.status(404).json({
+        error: "Contato não encontrado",
+        celular: false,
+      });
     }
-  );
+
+    res.json({
+      ...contato,
+      empresa_nomecompleto: contato.empresa.razao_social,
+      empresa_cnpj: contato.empresa.cnpj,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(422).json({ error: "Erro ao buscar contato" });
+  }
 };
 
-exports.deleteByIdAndEmpresaId = (req, res) => {
+exports.deleteByIdAndEmpresaId = async (req, res) => {
   const { id, empresa_id } = req.params;
 
   if (!id || !empresa_id) {
@@ -111,33 +123,27 @@ exports.deleteByIdAndEmpresaId = (req, res) => {
     });
   }
 
-  db.get(
-    "SELECT * FROM contatos WHERE id = ? AND empresa_id = ?",
-    [id, empresa_id],
-    (err, row) => {
-      if (err) {
-        console.error(err);
-        return res
-          .status(422)
-          .json({ error: "Erro ao verificar existência do contato" });
-      }
+  try {
+    const contato = await prisma.contatos.findFirst({
+      where: {
+        id: Number(id),
+        empresa_id: Number(empresa_id),
+      },
+    });
 
-      if (!row) {
-        return res.status(404).json({
-          error: "Contato não encontrado ou não pertence à empresa",
-        });
-      }
-
-      db.run("DELETE FROM contatos WHERE id = ?", [id], function (err) {
-        if (err) {
-          console.error(err);
-          return res
-            .status(422)
-            .json({ error: "Erro ao deletar contato" });
-        }
-
-        res.json({ message: "Contato deletado com sucesso" });
+    if (!contato) {
+      return res.status(404).json({
+        error: "Contato não encontrado ou não pertence à empresa",
       });
     }
-  );
+
+    await prisma.contatos.delete({
+      where: { id: Number(id) },
+    });
+
+    res.json({ message: "Contato deletado com sucesso" });
+  } catch (err) {
+    console.error(err);
+    res.status(422).json({ error: "Erro ao deletar contato" });
+  }
 };

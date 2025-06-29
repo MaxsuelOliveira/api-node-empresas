@@ -6,6 +6,6 @@ router.get("/", controller.listAll);
 router.get("/:empresa_id", controller.list);
 router.post("/", controller.create);
 router.post("/buscar", controller.findByCell);
-router.delete('/apagar', controller.deleteByIdAndEmpresaId);
+router.delete('/', controller.deleteByIdAndEmpresaId);
 
 module.exports = router;
