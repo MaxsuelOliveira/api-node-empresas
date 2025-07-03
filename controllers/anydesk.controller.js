@@ -2,8 +2,8 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 exports.create = async (req, res) => {
-  const { empresa_id , senha, descricao } = req.body;
-  let {codigo} = req.body;
+  const { empresa_id, senha, descricao } = req.body;
+  let { codigo } = req.body;
 
   if (!empresa_id || !codigo || !senha || !descricao) {
     return res.status(400).json({
@@ -25,7 +25,6 @@ exports.create = async (req, res) => {
       error: "Código anydesk já cadastrado para esta empresa",
     });
   }
-
 
   // Gera o link do anydesk
   codigo = codigo.replace(/[^a-zA-Z0-9]/g, ""); // Remove caracteres especiais
@@ -66,6 +65,47 @@ exports.list = async (req, res) => {
     res.status(422).json({ error: "Erro ao buscar registros" });
   }
 };
+
+// Listar todos os registros de anydesk orderados por empresa e 
+exports.listAll = async (req, res) => {
+  try {
+    const registros = await prisma.anydesk.findMany({
+      include: {
+        empresa: {
+          select: {
+            id: true,
+            razao_social: true,
+            cnpj: true,
+          },
+        },
+      },
+    });
+
+    // Agrupar registros por empresa
+    const agrupadosPorEmpresa = registros.reduce((acc, registro) => {
+      const empresaId = registro.empresa.id;
+
+      if (!acc[empresaId]) {
+        acc[empresaId] = {
+          empresa: registro.empresa,
+          anydesk: [],
+        };
+      }
+
+      acc[empresaId].anydesk.push(registro);
+
+      return acc;
+    }, {});
+
+    // Converter objeto para array
+    const resultado = Object.values(agrupadosPorEmpresa);
+
+    res.json(resultado);
+  } catch (err) {
+    console.error(err);
+    res.status(422).json({ error: "Erro ao listar registros" });
+  }
+}
 
 exports.delete = async (req, res) => {
   const { id, empresa_id } = req.body;

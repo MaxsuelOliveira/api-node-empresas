@@ -32,6 +32,46 @@ exports.create = async (req, res) => {
   }
 };
 
+// Listar servidores ordenados por empresa
+exports.listAll = async (req, res) => {
+  try {
+    const servidores = await prisma.servidores.findMany({
+      include: {
+        empresa: {
+          select: {
+            id: true,
+            razao_social: true,
+            cnpj: true,
+          },
+        },
+      },
+    });
+
+    // Agrupamento por empresa_id
+    const agrupados = servidores.reduce((acc, servidor) => {
+      const key = servidor.empresa_id;
+      if (!acc[key]) {
+        acc[key] = {
+          empresa: servidor.empresa,
+          servidores: [],
+        };
+      }
+      acc[key].servidores.push(servidor);
+      return acc;
+    }, {});
+
+    const resultado = Object.values(agrupados);
+
+    res.json(resultado);
+  } catch (err) {
+    console.error(err);
+    res
+      .status(422)
+      .json({ error: "Erro ao listar servidores", detail: err.message });
+  }
+};
+
+
 exports.list = async (req, res) => {
   const { empresa_id } = req.params;
 

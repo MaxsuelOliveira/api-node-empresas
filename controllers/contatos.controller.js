@@ -66,13 +66,83 @@ exports.list = async (req, res) => {
   }
 };
 
+// Listar todos os contatos orderados por empresa e nome do contato
 exports.listAll = async (req, res) => {
   try {
-    const contatos = await prisma.contatos.findMany();
-    res.json(contatos);
+    // Buscar contatos ordenados por empresa e nome do contato
+    const contatos = await prisma.contatos.findMany({
+      include: {
+        empresa: {
+          select: {
+            id: true,
+            razao_social: true,
+            cnpj: true,
+          },
+        },
+      },
+      orderBy: [{ empresa: { razao_social: "asc" } }, { nome: "asc" }],
+    });
+
+    // Agrupar contatos por empresa
+    const grouped = contatos.reduce((acc, contato) => {
+      const empresaId = contato.empresa.id;
+      if (!acc[empresaId]) {
+        acc[empresaId] = {
+          empresa: contato.empresa,
+          contatos: [],
+        };
+      }
+      acc[empresaId].contatos.push({
+        id: contato.id,
+        nome: contato.nome,
+        email: contato.email,
+        celular: contato.celular,
+        cargo: contato.cargo,
+        codigo: contato.codigo,
+        // qualquer outro campo do contato que queira passar
+      });
+      return acc;
+    }, {});
+
+    // Transformar em array para envio
+    const result = Object.values(grouped);
+
+    res.json(result);
   } catch (err) {
     console.error(err);
     res.status(422).json({ error: "Erro ao listar contatos" });
+  }
+};
+
+// Listar todos os contato ordenados por empresa
+exports.listAllByEmpresa = async (req, res) => {
+  try {
+    const contatos = await prisma.contatos.findMany({
+      include: {
+        empresa: {
+          select: {
+            id: true,
+            razao_social: true,
+            cnpj: true,
+          },
+        },
+      },
+      orderBy: {
+        empresa: {
+          razao_social: "asc",
+        },
+      },
+    });
+    res.json(
+      contatos.map((contato) => ({
+        ...contato,
+        empresa_nomecompleto: contato.empresa.razao_social,
+        empresa_cnpj: contato.empresa.cnpj,
+      }))
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(422).json({ error: "Erro ao listar contatos por empresa" });
   }
 };
 

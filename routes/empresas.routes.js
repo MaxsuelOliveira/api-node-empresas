@@ -8,7 +8,7 @@ router.get("/", controller.list);
 router.get("/:id", controller.getById);
 router.post("/", auth, isAdmin, controller.create);
 router.post("/buscar_empresa", controller.findByCnpjOrNomecompleto);
-router.put("/", auth, isAdmin, controller.update);
+router.put("/:id", auth, isAdmin, controller.update);
 router.delete("/", auth, isAdmin, controller.delete);
 
 module.exports = router;

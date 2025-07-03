@@ -70,6 +70,56 @@ exports.create = async (req, res) => {
   }
 };
 
+// Listar todos os helpdesks orderados por empresa e agrupados por empresas
+exports.listAll = async (req, res) => {
+  try {
+    const registros = await prisma.helpdesk.findMany({
+      include: {
+        empresa: {
+          select: {
+            id: true,
+            razao_social: true,
+            cnpj: true,
+          },
+        },
+      },
+    });
+
+    // Agrupamento por empresa
+    const agrupado = registros.reduce((acc, registro) => {
+      const { id, razao_social, cnpj } = registro.empresa || {};
+      const chave = `${id}-${razao_social}`;
+
+      if (!acc[chave]) {
+        acc[chave] = {
+          empresa: {
+            id,
+            razao_social,
+            cnpj,
+          },
+          helpdesks: [],
+        };
+      }
+
+      acc[chave].helpdesks.push({
+        ...registro,
+        empresa: undefined, // já está no agrupamento acima
+      });
+
+      return acc;
+    }, {});
+
+    const resultado = Object.values(agrupado);
+
+    res.json(resultado);
+  } catch (err) {
+    console.error(err);
+    res
+      .status(422)
+      .json({ error: "Erro ao listar helpdesks", detail: err.message });
+  }
+};
+
 exports.list = async (req, res) => {
   const { empresa_id } = req.params;
 
@@ -134,7 +184,12 @@ exports.delete = async (req, res) => {
 };
 
 exports.update = async (req, res) => {
-  const { id, empresa_id, email, senha } = req.body;
+  const { id } = req.params;
+  if (!id) {
+    return res.status(422).json({ error: "ID do helpdesk é obrigatório" });
+  }
+
+  const { empresa_id, email, senha } = req.body;
 
   if (!id || !empresa_id || !email || !senha) {
     return res.status(422).json({

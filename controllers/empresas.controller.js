@@ -35,9 +35,12 @@ exports.create = async (req, res) => {
   }
 };
 
+// Listar todas as empresas orderadas por nome em ordem crescente
 exports.list = async (req, res) => {
+  
   try {
     const empresas = await prisma.empresas.findMany({
+      orderBy: { razao_social: "asc" },
       include: {
         contatos: true,
         anydesk: true,
@@ -47,11 +50,13 @@ exports.list = async (req, res) => {
         certificados: true,
       },
     });
+
     res.json(empresas);
   } catch (err) {
     console.error(err);
     res.status(422).json({ error: err.message });
   }
+
 };
 
 exports.getById = async (req, res) => {
